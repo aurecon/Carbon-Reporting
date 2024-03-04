@@ -2,6 +2,7 @@ using Objects;
 using Objects.Geometry;
 using Speckle.Automate.Sdk;
 using Speckle.Core.Logging;
+using Speckle.Core.Models;
 using Speckle.Core.Models.Extensions;
 
 public static class AutomateFunction
@@ -23,15 +24,25 @@ public static class AutomateFunction
 
         var volumeObjects = commitObject
           .Flatten(b => false)
-          .Where(b => b[volume] is not null)
-          .Select(b => b);
+          .Where(b => b[volume] is not null);
+          //.Select<Base>(b => b);
 
 		automationContext.AttachResultToObjects(
 	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Info,
 	        "Objects with Volume",
-			volumeObjects.Select(x => x.id),
+			volumeObjects
+                .Where(x => x[volume] is double d && d > 0)
+                .Select(x => x.id),
 	        "Processed objects");
 
-    automationContext.MarkRunSuccess($"Counted {volumeObjects.Count()} objects");
+		automationContext.AttachResultToObjects(
+	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Error,
+	        "Objects with 0 or negative volume",
+	        volumeObjects
+				.Where(x => x[volume] is double d && d <= 0)
+				.Select(x => x.id),
+			"Processed objects");
+
+		automationContext.MarkRunSuccess($"Counted {volumeObjects.Count()} objects");
   }
 }
