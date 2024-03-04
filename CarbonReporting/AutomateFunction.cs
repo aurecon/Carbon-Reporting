@@ -1,3 +1,5 @@
+using CarbonReporting;
+using Newtonsoft.Json.Serialization;
 using Objects;
 using Objects.Geometry;
 using Speckle.Automate.Sdk;
@@ -24,12 +26,39 @@ public static class AutomateFunction
         var parameters = "parameters";
         var parameterVolume = "Volume";
 
-		var volumeObjects = commitObject
-          .Flatten(b => false)
-          .Where(b => 
-            (b[volume] is not null) ||
-			(b[parameters] is Base revitB && revitB[parameterVolume] is not null));
-          //.Select<Base>(b => b);
+		List<Base> volumeObjects = new();
+
+		foreach (var b in commitObject.Flatten())
+		{
+			if (b[volume] is not null)
+			{
+				volumeObjects.Add(b);
+				continue;
+			}
+
+			if (b[parameters] is Base @params && @params[parameterVolume] is not null)
+			{
+				volumeObjects.Add(b);
+				continue;
+			}
+		}
+
+		Dictionary<Base, double> calculatedVolume = new();
+		List<Task> calculationTasks = new();
+
+		foreach (Mesh m in volumeObjects.Where(b => b[volume] is double d && d == 0 && b is Mesh m).Cast<Mesh>())
+		{
+			Task calculationTask = Task.Run(() =>
+			{
+				double volume = MeshCalcs.CalculateVolume(m);
+				lock (calculatedVolume)
+				{
+					calculatedVolume[m] = volume;
+				}
+			});
+
+			calculationTasks.Add(calculationTask);
+		}
 
 		automationContext.AttachResultToObjects(
 	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Info,
@@ -41,13 +70,18 @@ public static class AutomateFunction
                 .Select(x => x.id),
 	        "Processed objects");
 
+		await Task.WhenAll(calculationTasks);
+
 		automationContext.AttachResultToObjects(
-	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Error,
-	        "Objects with 0 or negative volume",
-	        volumeObjects
-				.Where(x => x[volume] is double d && d <= 0)
-				.Select(x => x.id),
-			"Processed objects");
+	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Warning,
+	        "Objects with calculated volumes",
+			calculatedVolume				
+				.Select(x => x.Key.id),
+			"Processed objects",
+			calculatedVolume
+				.ToDictionary(
+					x => "CalculatedVolume",
+					x => x.Value as object));
 
 		automationContext.MarkRunSuccess($"Counted {volumeObjects.Count()} objects");
   }
