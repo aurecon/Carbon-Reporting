@@ -19,11 +19,19 @@ public static class AutomateFunction
 
     Console.WriteLine("Received version: " + commitObject);
 
-    var count = commitObject
-      .Flatten()
-      .Count(b => b.speckle_type == functionInputs.SpeckleTypeToCount);
+        var volume = "volume";
 
-    Console.WriteLine($"Counted {count} objects");
-    automationContext.MarkRunSuccess($"Counted {count} objects");
+        var volumeObjects = commitObject
+          .Flatten(b => false)
+          .Where(b => b[volume] is not null)
+          .Select(b => b);
+
+		automationContext.AttachResultToObjects(
+	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Info,
+	        "Objects with Volume",
+			volumeObjects.Select(x => x.id),
+	        "Processed objects");
+
+    automationContext.MarkRunSuccess($"Counted {volumeObjects.Count()} objects");
   }
 }
