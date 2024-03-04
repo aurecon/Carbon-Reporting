@@ -61,15 +61,25 @@ public static class AutomateFunction
 			calculationTasks.Add(calculationTask);
 		}
 
+		var outObjects = volumeObjects
+				.Where(x =>
+					(x[volume] is double d && d > 0))
+				//(x[parameters] is Base b && b[parameterVolume] is double v && v > 0))
+				.Select(x => x);
+
 		automationContext.AttachResultToObjects(
 			Speckle.Automate.Sdk.Schema.ObjectResultLevel.Info,
 			"Objects with Volume",
-			volumeObjects
-				.Where(x =>
-					(x[volume] is double d && d > 0) ||
-					(x[parameters] is Base b && b[parameterVolume] is double v && v > 0))
-				.Select(x => x.id),
-			"Processed objects");
+			outObjects.Select(x => x.id),
+			"Processed objects",
+
+			new Dictionary<string, object>()
+			{
+				{"Object ID Mapping","One-to-one" },
+				{"Volume",outObjects.Select(x => x[volume])}
+			}
+
+			);
 
 		await Task.WhenAll(calculationTasks);
 
@@ -82,7 +92,8 @@ public static class AutomateFunction
 
 			new Dictionary<string, object>()
 			{
-				{"Calculated Volume",calculatedVolume}
+				{"Object ID Mapping","One-to-one" },
+				{"Volume",calculatedVolume.Select(x => x.Value)}
 			});
 
 		automationContext.MarkRunSuccess($"Counted {volumeObjects.Count} objects");
