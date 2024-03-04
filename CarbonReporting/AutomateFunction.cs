@@ -21,17 +21,23 @@ public static class AutomateFunction
     Console.WriteLine("Received version: " + commitObject);
 
         var volume = "volume";
+        var parameters = "parameters";
+        var parameterVolume = "Volume";
 
-        var volumeObjects = commitObject
+		var volumeObjects = commitObject
           .Flatten(b => false)
-          .Where(b => b[volume] is not null);
+          .Where(b => 
+            (b[volume] is not null) ||
+			(b[parameters] is Base revitB && revitB[parameterVolume] is not null));
           //.Select<Base>(b => b);
 
 		automationContext.AttachResultToObjects(
 	        Speckle.Automate.Sdk.Schema.ObjectResultLevel.Info,
 	        "Objects with Volume",
 			volumeObjects
-                .Where(x => x[volume] is double d && d > 0)
+                .Where(x => 
+                    (x[volume] is double d && d > 0) ||
+                    (x[parameters] is Base b && b[parameterVolume] is double v && v > 0))
                 .Select(x => x.id),
 	        "Processed objects");
 
